@@ -17,3 +17,5 @@ tensorflow
 
 tensorflow-hub
 
+
+<b>Note: We will gradually release the source code upon approval of our administrative department.</b>
