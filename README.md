@@ -11,6 +11,8 @@ Prerequisites:
 
 Python 3.x
 
+numpy
+
 tensorflow
 
 tensorflow-hub
