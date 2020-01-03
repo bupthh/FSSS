@@ -150,8 +150,8 @@ if __name__ == '__main__':
         'max_iter': 100,
         'min_error': 1e-6,
         'selected_feature_ratio': 0.3,
-        'selected_feature_file_url': 'd:/hyx.txt',
-        'selected_feature_output_file_url': 'd:/hhh.txt'
+        'selected_feature_file_url': 'd:/selected_features.txt',
+        'selected_feature_output_file_url': 'd:/test_file_with_selected_features.txt'
 
     })
     fs = FeatureSelection(fs_attr_dict)
