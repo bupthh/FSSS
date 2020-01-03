@@ -4,7 +4,7 @@ In this package, two programs are provided as following:
 
 <b>FSSS</b>: This is our FSSS framework of feature selection, which includes training data building, algorithm implementation of feature selection, and output data generation based on selected features.  
 
-<b>LDB</b>: This is for the generation of Label Description Embedding (LDB). We use the Universal Sentence Encoder (https://tfhub.dev/google/collections/universal-sentence-encoder/1) to transform the label text. This encoder uses a transformer-network that is trained on a variety of data sources and a variety of tasks. By inputting a variable length label text, we can get the output of a 512-dimensional vector.
+<b>LED</b>: This is for the generation of Label Embedding (LED). We use the Universal Sentence Encoder (https://tfhub.dev/google/collections/universal-sentence-encoder/1) to transform the label text. This encoder uses a transformer-network that is trained on a variety of data sources and a variety of tasks. By inputting a variable length label text, we can get the output of a 512-dimensional vector.
 
 
 Prerequisites:
