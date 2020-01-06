@@ -4,6 +4,24 @@ import random as rdm
 
 
 class BuildDataset(object):
+    """
+    This class is for building dataset and model parameters for the FSSS framework of feature selection.
+
+    The built dataset includes:
+    1) Training and validation set: It is a data matrix X (nXd), which consists of n data instances with d
+    features. Each data instance is associated with a subset of k labels. For the data matrix X, the associated
+    label matrix can be denoted by Y (nXk), where each entry is a binary value (0, 1). The matrix of X and Y are
+    built from an input file stored in LIBSVM format: <label1, label2, ...> <index1>:<value1> <index2>:<value2> ...
+    2) Subset based on selected features: It is extracted from test dataset, which only contain the selected features.
+    3) Incomplete and noisy synthetic dataset: They are constructed by randomly deleting some labels of entries or
+    changing some entries’ values in the label matrix Y.
+
+    The model parameters includes:
+    1) All parameters in the objective function of FSSS model and its derivative, including W, S, B, P, Q, H, D.
+    2) The calculation of the objective function.
+    3) The calculation of the derivative of objective function.
+    4) All parameters of FSSS extended model for DAG and its calculation of objective and derivative function.
+    """
 
     features_num = 0
     labels_num = 0
@@ -36,6 +54,10 @@ class BuildDataset(object):
     noisy_ratio = 0.2
 
     def __init__(self, attr_list):
+        """
+        1. init the class's default parameters with new attributes
+        2. build 'parent-children' relation of tree or DAG based on the flga of dag_on
+        """
         for attr_name, attr_value in attr_list.items():
             setattr(self, attr_name, attr_value)
 
@@ -45,6 +67,9 @@ class BuildDataset(object):
             self.build_hier_parent_index()
 
     def build_hier_parent_index(self):
+        """
+        build 'parent-children' relation for tree structure of label space
+        """
         if type(self.hier_map_d) is str:
             with open(self.hier_map_d) as hf:
                 self.hier_map_d = hf.read().splitlines()
@@ -62,6 +87,9 @@ class BuildDataset(object):
                                           else -1)
 
     def build_dag_parent_index_set(self):
+        """
+        build 'parent-children' relation for DAG structure of label space
+        """
         if type(self.DAG_map_d) is str:
             with open(self.DAG_map_d) as hf:
                 self.hier_map_d = hf.read().splitlines()
@@ -87,6 +115,12 @@ class BuildDataset(object):
         print("DAG_parent_index_set={}".format(self.DAG_parent_index_set))
 
     def build_x_mat_from_file(self, file_url):
+        """
+        build the input data matrix of X (nXd) from a file.
+        :param file_url: input file stored in LIBSVM format:
+               <label1, label2, ...> <index1>:<value1> <index2>:<value2> ...
+        :return: input data matrix
+        """
         x_array = np.loadtxt(file_url, usecols=range(1, self.features_num + 1), dtype=str)
         x_mat = np.matlib.zeros((x_array.shape[0], self.features_num))
         it = np.nditer(x_array, flags=['multi_index'], order='C')
@@ -102,6 +136,13 @@ class BuildDataset(object):
         return x_mat
 
     def build_y_mat_from_file(self, file_url, row, col):
+        """
+        build the label matrix of Y from a file.
+        :param file_url: input file stored in LIBSVM format:
+        :param row: total row number of data instances
+        :param col: total number of label class
+        :return: the label matrix of Y, where each entry is a binary value (0, 1)
+        """
         y_mat = np.zeros((row, col), dtype=int)
         labels_y = np.loadtxt(file_url, usecols=0, dtype=str)
         it = np.nditer(labels_y, order='C')
@@ -122,19 +163,40 @@ class BuildDataset(object):
         return np.mat(y_mat)
 
     def build_b_mat_from_file(self, file_url):
+        """
+        build the pairwise similarity matrix for labels.
+        :param file_url: the file recoding all the label embedding representation vectors
+                        for their text descriptions
+        :return: the pairwise similarity matrix B for labels.
+        """
         embed_mat = np.mat(np.loadtxt(file_url))
         embed_mul_mat = embed_mat * embed_mat.T
         return embed_mul_mat / np.sum(embed_mul_mat)
 
     def build_s_mat(self, w_mat):
+        """
+        build the  pairwise similarity matrix for weights W
+        :param w_mat: the weight matrix W
+        :return: the pairwise similarity matrix for weights W
+        """
         w_mul_mat = w_mat.T * w_mat
         return w_mul_mat / np.sum(w_mul_mat)
 
     def build_d_mat(self, w_mat):
+        """
+        build the diagonal matrix D based on the weight matrix W
+        :param w_mat: the weight matrix W
+        :return: the diagonal matrix D
+        """
         w_mul_mat = w_mat * w_mat.T
         return np.mat(np.diag(np.reciprocal(2*np.power(np.diag(w_mul_mat) + self.epsilon, 0.5))))
 
     def build_w_parent_mat(self, w_mat):
+        """
+        build the parent matrix of weight matrix W
+        :param w_mat: the weight matrix W
+        :return: the parent matrix of weight matrix W
+        """
         split_mat = np.hsplit(w_mat, self.labels_num)
         w_parent_mat = np.matlib.rand((self.features_num, 0))
         for child_index, parent_index in enumerate(self.hier_parent_index):
@@ -143,6 +205,11 @@ class BuildDataset(object):
         return w_parent_mat
 
     def build_p_mat(self, labels_num):
+        """
+        build the mapping matrix P which transfers the weight matrix W to its parent matrix
+        :param labels_num: total number of label class
+        :return: the matrix P
+        """
         p_mat = np.matlib.zeros((labels_num, labels_num))
         for child_index, parent_index in enumerate(self.hier_parent_index):
             parent_index = child_index if parent_index == -1 else parent_index
@@ -150,6 +217,11 @@ class BuildDataset(object):
         return p_mat
 
     def build_dag_m_f_mat(self, labels_num):
+        """
+        buidl the self-replication matrix of columns for the weight matrix W in the extension DAG model.
+        :param labels_num: total number of label class
+        :return: the self-replication matrix M
+        """
         m_mat = np.matlib.zeros((labels_num, sum(self.DAG_parent_num_sets)))
         f_mat = np.matlib.zeros((labels_num, sum(self.DAG_parent_num_sets)))
         parent_pos = 0
@@ -161,6 +233,11 @@ class BuildDataset(object):
         return m_mat, f_mat
 
     def build_w_sibling_mat(self, w_mat):
+        """
+        build the sibling matrix of weight matrix W
+        :param w_mat: the weight matrix W
+        :return: the sibling matrix of weight matrix W
+        """
         split_mat = np.hsplit(w_mat, self.labels_num)
         w_sibling_mat = np.matlib.rand((self.features_num, 0))
 
@@ -175,6 +252,11 @@ class BuildDataset(object):
         return w_sibling_mat
 
     def build_q_mat(self, labels_num):
+        """
+        build the mapping matrix Q which transfers the weight matrix W to its sibling matrix
+        :param labels_num: total number of label class
+        :return:  the mapping matrix Q
+        """
         w_child_sibling_set = []
         sibling_nums = 0
         position = 0
@@ -198,6 +280,11 @@ class BuildDataset(object):
         return q_mat
 
     def build_dag_q_mat(self, labels_num):
+        """
+        build the sibling mapping matrix Q for the DAG extension model
+        :param labels_num: total number of label class
+        :return: the sibling mapping matrix Q
+        """
         w_child_sibling_set = []
         sibling_nums = 0
         position = 0
@@ -226,6 +313,10 @@ class BuildDataset(object):
         return q_mat
 
     def build_h_mat(self):
+        """
+        build the binary constant matrix H, which is used in the sibling mapping for weight matrix W
+        :return: the matrix H
+        """
         h_mat = np.zeros((sum(self.sibling_num_sets), self.labels_num))
         it = np.nditer(h_mat, flags=['multi_index'], op_flags=['readwrite'], order='C')
 
@@ -238,6 +329,11 @@ class BuildDataset(object):
         return np.mat(h_mat)
 
     def build_loss_function(self, parameters):
+        """
+        build the calculation of objective function of FSSS model
+        :param parameters: all parameters used in the objection function of FSSS model
+        :return: the calculation value of objective function
+        """
         x_mat = parameters['X']
         w_mat = parameters['W']
         y_mat = parameters['Y']
@@ -260,6 +356,11 @@ class BuildDataset(object):
         return l1 + alpha * l2 + beta * l3 + theta * l4 + gamma * l5
 
     def build_derivative_w(self, parameters):
+        """
+        build the calculation of the derivative of objective function of FSSS model
+        :param parameters: all parameters used in the derivative of objective function of FSSS model
+        :return: the calculation value of the derivative of objective function
+        """
         x_mat = parameters['X']
         w_mat = parameters['W']
         y_mat = parameters['Y']
@@ -292,6 +393,10 @@ class BuildDataset(object):
         return df_result
 
     def build_parameters(self):
+        """
+        build all parameters of the FSSS model
+        :return:  the hash table of all parameters of FSSS model
+        """
         parameters = dict()
         parameters['X'] = self.build_x_mat_from_file(self.input_file_url)
         parameters['W'] = np.matlib.rand((self.features_num, self.labels_num))
@@ -308,6 +413,11 @@ class BuildDataset(object):
         return parameters
 
     def build_dag_loss_function(self, parameters):
+        """
+        build the calculation of objective function of FSSS model for DAG
+        :param parameters: all parameters used in the objective function of FSSS DAG model
+        :return: the calculation value of objective function of FSSS DAG model
+        """
         x_mat = parameters['X']
         w_mat = parameters['W']
         y_mat = parameters['Y']
@@ -331,6 +441,11 @@ class BuildDataset(object):
         return l1 + alpha * l2 + beta * l3 + theta * l4 + gamma * l5
 
     def build_dag_derivative_w(self, parameters):
+        """
+        build the calculation of the derivative of objective function of FSSS DAG
+        :param parameters: all parameters used in the derivative of objective function of FSSS DAG model
+        :return: the calculation value of the derivative of objective function
+        """
         x_mat = parameters['X']
         w_mat = parameters['W']
         y_mat = parameters['Y']
@@ -363,6 +478,10 @@ class BuildDataset(object):
         return df_result
 
     def build_dag_parameters(self):
+        """
+        build all parameters of the FSSS DAG model
+        :return:  the hash table of all parameters of FSSS DAG model
+        """
         parameters = dict()
         parameters['X'] = self.build_x_mat_from_file(self.input_file_url)
         parameters['W'] = np.matlib.rand((self.features_num, self.labels_num))
@@ -379,8 +498,14 @@ class BuildDataset(object):
         return parameters
 
     @staticmethod
-    def print_parameters(parameters, name=None):
-        with open('d:/parameters', 'w') as pf:
+    def print_parameters(file_url, parameters, name=None):
+        """
+        print all or named parameters of FSSS model in a file
+        :param file_url: the output file
+        :param parameters: the hash table for all parameters
+        :param name: the named parameter
+        """
+        with open(file_url, 'w') as pf:
             if name is not None:
                 for item in name:
                     pf.write(item + '={}\n'.format(parameters[item]))
@@ -389,13 +514,15 @@ class BuildDataset(object):
                     pf.write(k + '={}\n'.format(v))
 
     @staticmethod
-    def arrange_feature_index(mat, rows, cols):
-        for i in range(rows):
-            for j in range(1, cols):
-                mat[i][j] = str(j) + ':' + mat[i][j].split(':')[1]
-
-    @staticmethod
     def construct_file_based_selected_features(examples, input_file_url, features, output_file_url):
+        """
+        construct the file of subset based on selected features
+        :param examples: the data matrix X with all original features
+        :param input_file_url: the label file for all data instances
+        :param features: the  feature subset selected by FSSS model
+        :param output_file_url: the output file of subset based on selected features
+        :return:
+        """
         labels_y = np.loadtxt(input_file_url, usecols=0, dtype=str)
         selected_examples = examples[:, features].astype(str)
         it_x = np.nditer(selected_examples, flags=['multi_index'], op_flags=['readwrite'], order='C')
@@ -411,6 +538,12 @@ class BuildDataset(object):
 
     @staticmethod
     def build_noisy_labels(labels, ratio):
+        """
+        build the noisy label matrix based on original label data matrix
+        :param labels: original label data matrix
+        :param ratio: the ratio of noisy labels
+        :return: the label matrix with noisy data
+        """
         labels_row_num, labels_features_num = labels.shape
         noisy_rows_num = int(labels_row_num * ratio)
         noisy_rows_set = set()
@@ -426,6 +559,12 @@ class BuildDataset(object):
 
     @staticmethod
     def build_missing_labels(labels, ratio):
+        """
+        build the incomplete label matrix based on original label data matrix
+        :param labels: original label data matrix
+        :param ratio: the ratio of incomplete labels
+        :return: the label matrix with incomplete data
+        """
         labels_row_num, labels_features_num = labels.shape
         missing_rows_num = int(labels_row_num * ratio)
         missing_rows_set = set()
