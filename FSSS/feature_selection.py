@@ -5,6 +5,11 @@ from build_dataset import BuildDataset
 
 
 class FeatureSelection(object):
+    """
+    This class is for algorithm implementation of feature selection of FSSS model, which includes two major steps:
+    1) the Armijo Rule to search for the suitable step size of gradient descent
+    2) the gradient descent algorithm based on Armijo Rule
+    """
 
     alpham = 1
     rho = 0.1
@@ -18,11 +23,25 @@ class FeatureSelection(object):
     selected_feature_output_file_url = ''
 
     def __init__(self, attr_list):
+        """
+        init the class's default parameters with new attributes
+        """
         for attr_name, attr_value in attr_list.items():
             setattr(self, attr_name, attr_value)
 
     @staticmethod
     def armijo_search(f, df, x, alpham, rho, t, parameters):
+        """
+        implement Armijo Rule to find the suitable step size of gradient descent
+        :param f: objective function of variable
+        :param df: derivative of objective function
+        :param x: variable
+        :param alpham: internal parameter
+        :param rho: internal parameter
+        :param t: internal parameter
+        :param parameters: the hash table of all parameters of FSSS model
+        :return: the suitable step size
+        """
         flag = 0
         x_value = parameters[x]
         a = 0
@@ -58,6 +77,13 @@ class FeatureSelection(object):
         return alpha
 
     def steepest_gradient_descent(self, f, df, parameters):
+        """
+        implement the gradient descent algorithm based on Armijo Rule
+        :param f: objective function
+        :param df: derivative of objective function
+        :param parameters: the hash table of all parameters of FSSS model
+        :return: None
+        """
         i = 0
         f_old = f(parameters)
 
@@ -79,10 +105,21 @@ class FeatureSelection(object):
 
     @staticmethod
     def get_selected_features_index(feature_mat):
+        """
+        get ranked selected features
+        :param feature_mat: the weight matrix
+        :return: the ranked selected features
+        """
         w_square_by_row = np.linalg.norm(feature_mat, ord=2, axis=1)
         return np.argsort(-w_square_by_row)
 
     def fsss(self, parameters, data_set):
+        """
+        implement the feature selection algorithm of FSSS model and its extension for DAG
+        :param parameters: the hash table of all parameters of FSSS model
+        :param data_set: the BuildDataset object
+        :return: the subset of selected features
+        """
         if data_set.dag_on:
             loss_fun = data_set.build_dag_loss_function
             derivative_fun = data_set.build_dag_derivative_w
@@ -95,6 +132,11 @@ class FeatureSelection(object):
         return self.get_selected_features_index(parameters['W'])
 
     def select_features(self, data_set):
+        """
+        implement the feature selection process of FSSS model and its extension for DAG
+        :param data_set: the BuildDataset object
+        :return: None
+        """
         if data_set.dag_on:
             paras = data_set.build_dag_parameters()
         else:
@@ -112,6 +154,11 @@ class FeatureSelection(object):
                 np.savetxt(sf, np.mat(f_mat_index + 1), fmt='%s')
 
     def build_test_file(self, data_set):
+        """
+        build the subset file of test set based on selected features, which will be used in the classification task
+        :param data_set: the BuildDataset object
+        :return: None
+        """
         test_mat = data_set.build_x_mat_from_file(data_set.test_file_url)
         selected_feature_num = int(data_set.features_num * self.selected_feature_ratio)
 
@@ -150,8 +197,8 @@ if __name__ == '__main__':
         'max_iter': 100,
         'min_error': 1e-6,
         'selected_feature_ratio': 0.3,
-        'selected_feature_file_url': 'd:/selected_features.txt',
-        'selected_feature_output_file_url': 'd:/test_file_with_selected_features.txt'
+        'selected_feature_file_url': 'd:/hyx.txt',
+        'selected_feature_output_file_url': 'd:/hhh.txt'
 
     })
     fs = FeatureSelection(fs_attr_dict)
